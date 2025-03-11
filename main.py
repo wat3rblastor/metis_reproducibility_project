@@ -55,58 +55,70 @@ for root, dirs, files in os.walk("PT"):
                 except Exception as e:
                     print(f"Error reading {file_path}: {e}")
 
-rtt_df = pd.DataFrame(rtt_matrix).fillna(np.inf)
-ip_hop_df = pd.DataFrame(ip_hop_matrix).fillna(np.inf)
+# DataFrame Construction (Remove infinities now)
+rtt_df = pd.DataFrame(rtt_matrix).replace(np.inf, np.nan)
+ip_hop_df = pd.DataFrame(ip_hop_matrix).replace(np.inf, np.nan)
 
-print(rtt_df)
-print(ip_hop_df)
 
-# filter our using the distance calculation
-rtt_df = rtt_df.replace("NA", np.nan).astype(float)
-ip_hop_df = ip_hop_df.replace("NA", np.nan).astype(float)
 
-# choose the number of neighbors we want
-k = 5
+# Drop rows/columns that are fully NaN (probes with no connections)
+rtt_df.dropna(how='all', inplace=True)
+rtt_df.dropna(axis=1, how='all', inplace=True)
 
+ip_hop_df.dropna(how='all', inplace=True)
+ip_hop_df.dropna(axis=1, how='all', inplace=True)
+
+print("Cleaned RTT Matrix:\n", rtt_df)
+print("Cleaned IP Hop Matrix:\n", ip_hop_df)
+
+# Closeness Calculation
 def compute_closeness(matrix):
     avg_distances = []
     for probe in matrix.index:
-        distances = matrix.loc[probe].dropna().sort_values()
-        nearest_distances = distances[:k]  # Take k-nearest
-        avg_dist = nearest_distances.mean()
+        distances = matrix.loc[probe].dropna()  # Ignore NaN entries
+        total_distance = distances.sum()  # Sum all reachable probes
+
+        # If no valid distances remain, mark the probe as unreachable
+        avg_dist = total_distance if total_distance > 0 else inf
+
         avg_distances.append((probe, avg_dist))
-    
+
     return pd.DataFrame(avg_distances, columns=["Probe", "AvgDistance"]).set_index("Probe")
 
 
-
-# compute redundancy scores (lower = more redundant)
+# Compute redundancy scores (lower = more redundant)
 rtt_scores = compute_closeness(rtt_df)
 ip_hop_scores = compute_closeness(ip_hop_df)
 
 # Combine scores (simple average of RTT and IP hop count scores)
-combined_scores = (rtt_scores + ip_hop_scores) / 2
+combined_scores = pd.concat([rtt_scores, ip_hop_scores], axis=1)
+combined_scores.columns = ["RTT_Score", "IP_Hop_Score"]
+combined_scores["AvgDistance"] = combined_scores.mean(axis=1)
+
 combined_scores = combined_scores.sort_values(by="AvgDistance")
 
+# Probe Selection Algorithm (Metis)
 def metis_selection(matrix, target_size):
     selected_probes = matrix.copy()
-    
+
     while len(selected_probes) > target_size:
-        scores = compute_closeness(selected_probes)  # Recalculate scores
-        probe_to_remove = scores.idxmin()["AvgDistance"]  # Remove the most redundant probe
-        selected_probes = selected_probes.drop(index=probe_to_remove, columns=probe_to_remove)
-    
+        scores = compute_closeness(selected_probes).dropna()
+
+        if scores.empty:
+            print("All remaining probes are unreachable. Stopping selection.")
+            break
+
+        probe_to_remove = scores.idxmin()["AvgDistance"]
+        selected_probes.drop(index=probe_to_remove, columns=probe_to_remove, inplace=True)
+
     return selected_probes
 
-# Define the final number of probes (adjust as needed)
+# Define the final number of probes
 final_probe_count = 5
 
 # Apply Metis probe selection
 selected_probes = metis_selection(rtt_df, final_probe_count)
 
-# Save results
-selected_probes.to_csv("selected_probes.csv")
+# Save results in correct format
+selected_probes.to_csv("selected_probes.csv", index=True, header=True)
 print(f"Final {final_probe_count} probes saved to 'selected_probes.csv'")
-
-
-
