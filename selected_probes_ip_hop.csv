@@ -1,0 +1,15 @@
+### Selected Probes ###
+Selected_Probes
+85.138.172.35
+80.243.84.215
+185.83.215.224
+192.168.1.111
+192.168.1.117
+
+### Distance Matrix ###
+,85.138.172.35,80.243.84.215,185.83.215.224,192.168.1.111,192.168.1.117
+85.138.172.35,No Connection,4.0,8.0,6.0,6.0
+80.243.84.215,4.0,No Connection,No Connection,255.0,255.0
+185.83.215.224,8.0,No Connection,No Connection,255.0,255.0
+192.168.1.111,6.0,255.0,255.0,No Connection,No Connection
+192.168.1.117,6.0,255.0,255.0,No Connection,No Connection

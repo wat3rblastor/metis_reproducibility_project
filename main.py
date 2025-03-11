@@ -8,6 +8,7 @@ ip_list = []
 rtt_matrix = {}
 ip_hop_matrix = {}
 
+# Data Extraction
 for root, dirs, files in os.walk("PT"):
     for file in files:
         if file.endswith(".json"):
@@ -59,8 +60,6 @@ for root, dirs, files in os.walk("PT"):
 rtt_df = pd.DataFrame(rtt_matrix).replace(np.inf, np.nan)
 ip_hop_df = pd.DataFrame(ip_hop_matrix).replace(np.inf, np.nan)
 
-
-
 # Drop rows/columns that are fully NaN (probes with no connections)
 rtt_df.dropna(how='all', inplace=True)
 rtt_df.dropna(axis=1, how='all', inplace=True)
@@ -85,17 +84,9 @@ def compute_closeness(matrix):
 
     return pd.DataFrame(avg_distances, columns=["Probe", "AvgDistance"]).set_index("Probe")
 
-
 # Compute redundancy scores (lower = more redundant)
 rtt_scores = compute_closeness(rtt_df)
 ip_hop_scores = compute_closeness(ip_hop_df)
-
-# Combine scores (simple average of RTT and IP hop count scores)
-combined_scores = pd.concat([rtt_scores, ip_hop_scores], axis=1)
-combined_scores.columns = ["RTT_Score", "IP_Hop_Score"]
-combined_scores["AvgDistance"] = combined_scores.mean(axis=1)
-
-combined_scores = combined_scores.sort_values(by="AvgDistance")
 
 # Probe Selection Algorithm (Metis)
 def metis_selection(matrix, target_size):
@@ -116,30 +107,30 @@ def metis_selection(matrix, target_size):
 # Define the final number of probes
 final_probe_count = 5
 
-# Apply Metis probe selection
-selected_probes = metis_selection(rtt_df, final_probe_count)
+# Select probes separately for RTT and IP Hops
+selected_probes_rtt = metis_selection(rtt_df, final_probe_count)
+selected_probes_ip_hop = metis_selection(ip_hop_df, final_probe_count)
 
 # Save results in a clearer format
-# Save results in a clearer format
-def save_results(selected_probes, rtt_df):
+def save_results(selected_probes, distance_df, filename):
     # Section 1: List of Selected Probes
     selected_probes_list = pd.DataFrame(selected_probes.index, columns=["Selected_Probes"])
     
     # Section 2: Distance Matrix for Selected Probes
-    selected_distance_matrix = rtt_df.loc[selected_probes.index, selected_probes.index].fillna("No Connection")
+    selected_distance_matrix = distance_df.loc[selected_probes.index, selected_probes.index].fillna("No Connection")
     
     # Combine both sections in one CSV
-    with open("selected_probes.csv", "w") as f:
+    with open(filename, "w") as f:
         f.write("### Selected Probes ###\n")
         selected_probes_list.to_csv(f, index=False)
         
         f.write("\n### Distance Matrix ###\n")
-        selected_distance_matrix.to_csv(f, index=True)  # FIX: Add `index=True`
+        selected_distance_matrix.to_csv(f, index=True)  
 
-    print(f"Final results saved to 'selected_probes.csv' in a much better format. sorry ben :(")
+    print(f"Results saved to '{filename}'")
 
+# Save RTT and IP Hop Results Separately
+save_results(selected_probes_rtt, rtt_df, "selected_probes_rtt.csv")
+save_results(selected_probes_ip_hop, ip_hop_df, "selected_probes_ip_hop.csv")
 
-save_results(selected_probes, rtt_df)
-
-# Save results in correct format
-print(f"Final {final_probe_count} probes saved to 'selected_probes.csv'")
+print(f"Final {final_probe_count} probes saved in separate RTT and IP Hop files.")
