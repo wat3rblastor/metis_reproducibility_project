@@ -119,6 +119,27 @@ final_probe_count = 5
 # Apply Metis probe selection
 selected_probes = metis_selection(rtt_df, final_probe_count)
 
+# Save results in a clearer format
+# Save results in a clearer format
+def save_results(selected_probes, rtt_df):
+    # Section 1: List of Selected Probes
+    selected_probes_list = pd.DataFrame(selected_probes.index, columns=["Selected_Probes"])
+    
+    # Section 2: Distance Matrix for Selected Probes
+    selected_distance_matrix = rtt_df.loc[selected_probes.index, selected_probes.index].fillna("No Connection")
+    
+    # Combine both sections in one CSV
+    with open("selected_probes.csv", "w") as f:
+        f.write("### Selected Probes ###\n")
+        selected_probes_list.to_csv(f, index=False)
+        
+        f.write("\n### Distance Matrix ###\n")
+        selected_distance_matrix.to_csv(f, index=True)  # FIX: Add `index=True`
+
+    print(f"Final results saved to 'selected_probes.csv' in a much better format. sorry ben :(")
+
+
+save_results(selected_probes, rtt_df)
+
 # Save results in correct format
-selected_probes.to_csv("selected_probes.csv", index=True, header=True)
 print(f"Final {final_probe_count} probes saved to 'selected_probes.csv'")
