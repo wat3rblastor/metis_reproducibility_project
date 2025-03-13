@@ -7,13 +7,15 @@ from math import inf
 ip_list = []
 rtt_matrix = {}
 ip_hop_matrix = {}
+probe_id_map = {}  # Stores {IP: Probe_ID}
+finalprobes = []
 
 # Data Extraction
 for root, dirs, files in os.walk("PT"):
     for file in files:
         if file.endswith(".json"):
             file_path = os.path.join(root, file)
-
+            probe_id = os.path.splitext(file)[0]
             with open(file_path, "r") as f:
                 try:
                     for line in f:
@@ -24,8 +26,10 @@ for root, dirs, files in os.walk("PT"):
                             if not destination_ip_responded:
                                 continue
 
-                            src_ip = data["src_addr"]
+                            src_ip = data["from"]
                             dst_ip = data["dst_addr"]
+                            if src_ip not in probe_id_map:
+                                probe_id_map[src_ip] = probe_id
 
                             if src_ip not in ip_list:
                                 ip_list.append(src_ip)
@@ -105,7 +109,7 @@ def metis_selection(matrix, target_size):
     return selected_probes
 
 # Define the final number of probes
-final_probe_count = 5
+final_probe_count = 100
 
 # Select probes separately for RTT and IP Hops
 selected_probes_rtt = metis_selection(rtt_df, final_probe_count)
@@ -113,9 +117,12 @@ selected_probes_ip_hop = metis_selection(ip_hop_df, final_probe_count)
 
 # Save results in a clearer format
 def save_results(selected_probes, distance_df, filename):
-    # Section 1: List of Selected Probes
-    selected_probes_list = pd.DataFrame(selected_probes.index, columns=["Selected_Probes"])
-    
+    # Section 1: List of Selected Probes (IP and Probe ID)
+    selected_probes_list = pd.DataFrame(
+        [(probe, probe_id_map.get(probe, "Unknown")) for probe in selected_probes.index],
+        columns=["IP Address", "Probe ID"]
+    )
+
     # Section 2: Distance Matrix for Selected Probes
     selected_distance_matrix = distance_df.loc[selected_probes.index, selected_probes.index].fillna("No Connection")
     
@@ -128,6 +135,20 @@ def save_results(selected_probes, distance_df, filename):
         selected_distance_matrix.to_csv(f, index=True)  
 
     print(f"Results saved to '{filename}'")
+
+# Save only the probe IDs to separate text files
+def save_probe_ids(selected_probes, filename):
+    with open(filename, "w") as f:
+        f.write("[")
+        for probe in selected_probes.index:
+            f.write(f"{probe_id_map.get(probe, 'Unknown')},\n")
+        f.write("]")
+    print(f"Probe IDs saved to '{filename}'")
+
+# Save RTT and IP Hop Probe IDs
+save_probe_ids(selected_probes_rtt, "selected_probe_ids_rtt.txt")
+save_probe_ids(selected_probes_ip_hop, "selected_probe_ids_ip_hop.txt")
+
 
 # Save RTT and IP Hop Results Separately
 save_results(selected_probes_rtt, rtt_df, "selected_probes_rtt.csv")
