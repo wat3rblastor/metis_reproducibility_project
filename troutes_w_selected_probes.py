@@ -27,8 +27,8 @@ potential_probes = [51190,1003030,61151,60983,33827,21242,1002996,1001845,54806,
     50483,1004118,54938,50252,1001271]
 
 x = 100
-
-addresses_and_probes = [{"address": address, "probes": random.sample(potential_probes, x)} for address in addresses]
+probes = random.sample(potential_probes, x)
+addresses_and_probes = [{"address": address, "probes": probes} for address in addresses]
 
 headers = {
 
